@@ -1,0 +1,546 @@
+---
+title: "PrePublication Intervention - Measures Paper"
+author: "Oguchi Nkwocha, MD., MSc."
+date: "December 19, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+setwd("C:/Users/Dr. Nkwocha/Dropbox/PblshMsrs")
+library(ggplot2)
+library(forecast)
+library(astsa)
+library(lmtest)
+library(fUnitRoots)
+library(FitARMA)
+library(strucchange)
+library(reshape)
+library(Rmisc)
+library(fBasics)
+library(tsoutliers)
+library(TSA)
+library(TTR)
+library(lme4)
+library(timeSeries)
+library(calibrate)
+library(vars)
+library(readr)
+library(gridExtra)
+library(grid)
+library(htmlTable)
+library(dygraphs)
+library(xts)
+library(magrittr)
+#get file
+paj <- read.csv("PajaroVisits-hr.csv")
+#convert to time series
+paj_ts <-ts(paj$visits.hr)
+plot(paj_ts)
+#Check for outliers and type of time series
+outliers_paj_ts <- tso(paj_ts, types = c("TC", "AO", "LS", "IO", "SLS"))
+outliers_paj_ts
+#ID outliers
+outlier_idx <-outliers_paj_ts$outliers$ind
+outlier_idx
+#Plot
+plot(outliers_paj_ts)
+
+y <-as.numeric(paj_ts[1:9])
+x<-c(1:9)
+predta <- as.data.frame(cbind(x,y))
+pre_mn <- lm(y~x, predta)
+mean(pre_mn$fitted.values)
+
+
+yp <-as.numeric(paj_ts[13:18])
+xp<-c(13:18)
+pstdta <- as.data.frame(cbind(xp,yp))
+pst_mn <- lm(yp~xp, pstdta)
+mean(pst_mn$fitted.values)
+
+#Check for statistical significance T test
+
+t.test(pre_mn$fitted.values,pst_mn$fitted.values)
+
+
+#Get pre-effect mean value at 13 by extrapolation of pre_mn;
+pre_mn.13 <- pre_mn$coefficients[1] + pre_mn$coefficients[2]*13
+pre_mn.13
+
+#Get effect value at 13
+pst_mn.13 <- pst_mn$fitted.values[1]
+pst_mn.13
+
+AO.size <- pst_mn.13 - pre_mn.13
+AO.size
+
+#
+#F test to compare two variances
+var.test(pre_mn$fitted.values,pst_mn$fitted.values)
+#p-value = 0.7877; fail to reject null; therefore,true ratio of variances is equal to 1 (ie, no difference)
+
+#Check for covariance of time matrix with cov:
+pre.ts <-ts(paj$visits.hr[1:9])
+pre.tsm<-as.matrix(pre.ts)
+cov(pre.tsm)
+#[,1]
+#[1,] 0.032975
+pst.ts<-ts(paj$visits.hr[13:18])
+pst.tsm<-as.matrix(pst.ts)
+cov(pst.tsm)
+#[,1]
+#[1,] 0.2698567
+
+#Check for Correlationship of time series with cor
+cor(pre.tsm)
+cor(pst.tsm)
+
+#Visualizing
+plot(pst_mn$fitted.values, xlim=c(1,20))
+lines(pst_mn$fitted.values)
+
+ypre<-pre_mn$fitted.values
+xpr <-c(1:9)
+pre.dta<-cbind(xpr,ypre)
+colnames(pre.dta) <- c("month", "val")
+pre.dta
+
+ypst<-pst_mn$fitted.values
+xpst <-c(13:18)
+pst.dta<-cbind(xpst,ypst)
+colnames(pst.dta) <- c("month#", "val")
+pst.dta
+
+x.na <-c(NA,NA,NA)
+y.na <-c(NA,NA,NA)
+na.dta <-cbind(x.na,y.na)
+
+mdata <-rbind(pre.dta, na.dta)
+
+nwdta <- rbind(mdata,pst.dta)
+
+#Re-number rows
+rownames(nwdta) = 1:dim(nwdta)[1]
+nwdta
+####### Use segment lines
+plot(nwdta, xlim=c(0,20), ylim=c(1.0,3.0), col="blue",lty =1)
+segments(1,1.706, 9,1.3607, col = "blue")
+segments(13,2.080,18,1.7361, col = "blue")
+segments(9,1.3607, 13,1.188, lty=2, col = "brown")
+lines(paj_ts,col="black",lty =1 )
+abline(v=c(9.0,13.0), col="orange")
+
+#Apply linear decay function to post curve: https://sciencing.com/write-linear-decay-function-8646603.html
+# the common form of the decay function: 
+#f(t) = C - r*t. In this equation, t is time, C is a constant, and r is the rate of decay.
+# my deduction: r = slope of x in the regression curve
+#f(t) = 2.080476 -pst_mn$coefficients[2](t)
+decay <- -(pst_mn$fitted.values[1]-pre_mn$fitted.values[9])/pst_mn$coefficients[2]
+#Meaning: if current course is continued, in 10.5 months, back to value at time of starting the measure.
+
+
+```
+
+Title: Analyzing Interventions in Healthcare
+
+Contemporary Health care is well into the process of embracing the paradigm of "value-based" decisions with regards to assessment,  comparison and purchase of traditional health care products, in much the same manner that the society deals with commodities. Objective analysis of "value-basis" calls for quantification and measurability of that which defines the essence or representation of the value-base (called a "Measure") of interest. While the quantitative size of a Measure has an intrinsic worth in and of itself, Industry usually focuses on the dynamic changeability of this quantity, with the aim of favoring results which optimize the Industry's goal. In addition to intrinsic dynamism (seasonal changes, for example), the opportunity exists to deliberately cause changes in the value of Measure using interventions, with the goal of maximizing a preferred outcome. Interventions are deliberate influences which are introduced and directed towards the Measures to change their values in one direction or the other, in order to gain a practical, tactical, operational or competitive advantage.
+
+Modern progressive Industries use interventions as tools to effect change of Measures. These industries also rate the interventions for effectiveness; as a bonus, they obtain useful, actionable feedback on their own operations based on how those operations respond to the interventions. Naturally, to optimize the investment in interventions, the latter need to be rated and compared objectively using common parameters.  
+
+Interventions are also the tools with which present healthcare organizations expect to make  desired changes in the Measures that are being assesses. The rating of an intervention as a tool thus assumes an important role: how powerful is it, and how does it compare with other tools? 
+
+The objective of this article is to use statistical methodology to determine if an intervention has produced a measurable change (at all) in the value of a Measure; and if so, to quantify and then characterize the effect through statisitcal analysis.
+
+This article analyzes the effectiveness of an intervention which was implemented in a medical clinic with the objective of increasing the number of patients seen per hour by the doctor. The Measure is called "visits per hour"; the values are obtained by averaging the number of patients per "productive hour" by months seen by the doctor working eight "productive hours" each work day. Raw data is collected over a period starting from January 2016 to June 2017, yielding a total of 18 months or eighteen data-points, by the Practice Management application and then dumped into Excel for further munging. Analysis and analytics are performed using R Programming Language.
+
+It is useful (but  not necessary) to know when the intervention was instituted in order to obtain more informative analysis. In this example, the intervention was made in the month of September 2016 (Month #9)
+
+Method:
+
+1. Set up the R environment
+
+```{r environ echo=FALSE}
+library(ggplot2)
+library(forecast)
+library(astsa)
+library(lmtest)
+library(fUnitRoots)
+library(FitARMA)
+library(strucchange)
+library(reshape)
+library(Rmisc)
+library(fBasics)
+library(tsoutliers)
+library(TSA)
+library(TTR)
+library(lme4)
+library(timeSeries)
+```
+
+2. Load File and convert to Time Series
+```{r dataset, echo=FALSE}
+setwd("C:/Users/Dr. Nkwocha/Dropbox/PblshMsrs")
+paj <- read.csv("PajaroVisits-hr.csv")
+paj_ts <-ts(paj$visits.hr)
+plot(paj_ts, ylab = "visits/hr", xlab ="month#", main = "Measure: Visits per Hour")
+
+```
+
+```{r alternative plot, echo=FALSE}
+yyy<-paj[3]
+xxx<-c(1:18)
+pajdta <- as.data.frame(cbind(xxx,yyy))
+dygraph(pajdta, ylab = "visits/hr", xlab ="month#", main = "Time Series of Measure: 'Visits per Hour'") %>%
+ dyAxis("y", valueRange = c(1, 3.0)) 
+```
+
+
+Intervention effect:
+The most important objective is to find out if an effect occurred following an intervention. To accomplish this, we use the Outlier Function of a timeseries (tsoutlier). The statistics behind outlier identification is well worked out (reference) and well tried (reference). Different types of outliers are described therein(IBID Ref 1). Essentially, the outlier function identifies values that are out of the statistically expected range. Any outliers picked up by the function satisfies the condtion of statistical significance. These and when they occurred are assigned as the effect of the intervention.
+
+OUTLIER IDENTIFICATION
+
+
+```{r outliers, echo=FALSE}
+
+outliers_paj_ts <- tso(paj_ts, types = c("TC", "AO", "LS", "IO", "SLS"))
+outliers_paj_ts
+
+```
+The resulting call above identifies 1 outlier of the "Additive Outlier" (AO) type, occurring on month # 13, with a coefficient (coefhat) of 1.3953, which is equal to an absolutete change of +1.395*1 = 1.395 from the estimated / projected baseline at month # 13 (see graph below). AO-type 
+
+Plot outliers
+```{r plot outliers,  echo=FALSE}
+outlier_idx <-outliers_paj_ts$outliers$ind
+#outlier_idx
+plot(outliers_paj_ts)
+
+```
+
+The interpretation of the result of the intervention is that the effect started taking place at month # 13, when there was a change in the value of the Measure of the size of approximatley 1.4 visits per hour over the baseline, and this specific change lasted over one month. In practical terms, a jump of 1.4 visits per hour in an 8-productive hour practice is equivalent to approximately 11 extra visits per day for that month.
+
+To determine the full effect of the intervention, we have to determine if there has been a change in means before and after the effect took place. The gold standard of interventional change analyis in scientific literature and practice is a statistically significant difference betweeen the means of 2 samples. In our case, we know that the intervention was implemented in month # 9, so this defines our pre-intervention time. Outliers analysis identifies week # 13 as when the intervention effect started, which thus fixes the post-effect initialization time.
+
+In order to determine the means of our pre- and post- intervention samples, we perform a linear regression function on months 1 to 9 and 13 to 18. Next, we perform a t-test to prove if there is a statisitical difference between the means.
+
+```{r regressions,  echo=FALSE}
+#pre- effect
+y <-as.numeric(paj_ts[1:9])
+x<-c(1:9)
+predta <- as.data.frame(cbind(x,y))
+pre_mn <- lm(y~x, predta)
+mean.pre<-mean(pre_mn$fitted.values)
+mean.pre
+
+#post effect
+yp <-as.numeric(paj_ts[13:18])
+xp<-c(13:18)
+pstdta <- as.data.frame(cbind(xp,yp))
+pst_mn <- lm(yp~xp, pstdta)
+mean.post<-mean(pst_mn$fitted.values)
+mean.post
+```
+
+```{r t-test, echo=FALSE}
+#Check for statistical significance T test
+
+t.test(pre_mn$fitted.values,pst_mn$fitted.values)
+```
+t-test of the two means at a p-value of 0.0001835 leads to a rejection of the null hypothesis and acceptance of the alternate hypothesis that "true difference in means is not equal to 0", meaning that there is a statistically significnat difference between the 2 means.
+
+The conclusion regarding this intervention implemented on month # 9 is that it has produced a statistically significant difference in the mean pre versus post intervention (of size, + 0.375 visits/hr, or average of 3 extra patients per 8-productive hour work-day), starting on month # 13.
+
+
+Plot of intervention
+
+```{r intervention effect plot, echo=FALSE}
+#Visualizing
+# plot(pst_mn$fitted.values, xlim=c(1,20))
+# lines(pst_mn$fitted.values)
+
+#new pre-dataset 
+ypre<-pre_mn$fitted.values
+xpr <-c(1:9)
+pre.dta<-cbind(xpr,ypre)
+colnames(pre.dta) <- c("month#", "visits/hr")
+pre.dta
+
+#new post dataset
+ypst<-pst_mn$fitted.values
+xpst <-c(13:18)
+pst.dta<-cbind(xpst,ypst)
+colnames(pst.dta) <- c("month#", "visits/hr")
+pst.dta
+
+#Assign NA to unused segment between month #'s  9 and 13
+x.na <-c(NA,NA,NA)
+y.na <-c(NA,NA,NA)
+na.dta <-cbind(x.na,y.na)
+
+#bind rows
+mdata <-rbind(pre.dta, na.dta)
+nwdta <- rbind(mdata,pst.dta)
+
+#Re-number rows
+rownames(nwdta) = 1:dim(nwdta)[1]
+nwdta
+####### Use segment lines
+plot(nwdta, xlim=c(0,20), ylim=c(1.0,3.0), col="blue",lty =1, main ="Time Series and Intervention Effects")
+segments(1,1.706, 9,1.3607, col = "blue") #pre regression line
+segments(13,2.080,18,1.7361, col = "blue") #post regression line
+segments(9,1.3607, 13,1.188, lty=2, col = "brown") # extrapolation of pre regression line
+lines(paj_ts,col="black",lty =1 ) # original time series
+abline(v=c(9.0,13.0), col="orange") # Intervention implemented @ 9 and effects start @ 13 mos
+
+```
+MORE INFORMATION FROM THE INTERVENTION AND ITS EFFECTS.
+
+More useful and actionable information can be derived from the foregoing analysis. For example, where there is a known intervention implementation time (as in this example), how long was it before the effect was observed (time period); and how fast (rate: delta / time)? Given an effect, what is the decay time (if decreasing) or doubling time (if increasing)? Decay-time and Doubling-time can serve as analytical prediction-equivalents.
+
+Other information unpacks the hidden potential of an intervention. For example, in most industries, a newly introduced tool or method is rated on the within-batch variance of the units of the new items produced (the smaller the better), speaking to Consistency. With interventions, the pre and post variance of the subsets of data is readily available. On a related note, the ideal reproducible and or teachable change (intervention) effect is the presence of Correlation: a new value building on the previous one, ensuring stability. A chaotic or discontinuous response to an intervention even when the latter has produced a significant mean-change would seem less desirable and or reliable than one with a stable effect. The pre and post intervention effect in terms of variances and correlations can be analyzed.
+
+Visual inspection of the plots may also reveal other information such as a comparison of the pre and post effect slope of the regressions. For example, if the slopes are in the same direction and are nearly the same gradient, one interpretation is systemic inertia; this would be extremely useful information for the organization pursuing improvement of measures in deciding whether the intervention or the system is the problem.
+
+These kinds of analyses are not limited to one system and or one interventional regimen. Using the parameters above, a given regimen's effect as above can be compared among several subsystems; the latter could be different sites of an organization, or different measures at a given site to which the same intervention was applied. In the same vein, the performance of different interventions can be compared as such given the same location. A multi-clinic health care organization working with several measures at the same time provides an example which satisfies the aforementioned scenarios. 
+
+Using our example:
+
+
+
+Intervention introduced: wk# 9
+Effect started wk # 13.
+Time to produce effect: 4 months.
+Effect produced: +0.375 visits/hr change in pre and post mean.
+*Rate of mean-change: +0.375 visits/hr/4 months= 0.09375 visitis/hr/month.
+*(The above applies to the scenario where the date of intervention introduction is known. When that factor is unknown, the rate of change is incalulabe and is unknown.)
+
+#####################################
+
+Calculating Decay time. 
+Decay time is the time it will take, given the current post effect regression trend, for any changes to return to baseline, which in this case is the fitted pre-effect regression value at the start of the intervention (month # 9)
+We are dealing with Linear Decay Time (as opposed to more popular exponential Decay Time, which does not apply here). This is a function of the equation of the Linear Regression model.
+
+```{r decay time, doubling time}
+# Obtain value @ month # 9, baseline
+# y <-as.numeric(paj_ts[1:9])
+# x<-c(1:9)
+# predta <- as.data.frame(cbind(x,y))
+pre_mn <- lm(y~x, predta)
+pre_mn
+at9 <-pre_mn$coefficients[1] + pre_mn$coefficients[2]*9  #value at 9 using regression formula
+at9
+#>(Intercept) 
+#>  1.360667
+
+#Calculate time for y = at9
+# yp <-as.numeric(paj_ts[13:18])
+# xp<-c(13:18)
+# pstdta <- as.data.frame(cbind(xp,yp))
+pst_mn <- lm(yp~xp, pstdta)
+pst_mn
+
+#1.360667 = pst_mn$coefficients[1] + pst_mn$coefficients[2]*t
+t = (1.360667-pst_mn$coefficients[1])/pst_mn$coefficients[2]
+t
+```
+The result: at month approximately month # 23, the effect of the intervention will have dissipated, all things being equal (ie., at the current rate); this therefore works like a prediction. This means that 10 months after the beginning of the effects of the intervention, at the present rate, the estimated value of the measure will be the same as it was on the eve of institution of the intervention.
+
+The Doubling Time will apply to a positive regression slope and calculation is similar to the above. Let's assume the slope was positive, then y in the post regression equation = 2*at9. 
+
+DETERMINING CORRELATION
+
+```{r CORrelation, echo = FALSE}
+
+#COR
+
+#pre
+# y <-as.numeric(paj_ts[1:9])
+# x<-c(1:9)
+predta <- as.data.frame(cbind(x,y))
+cor_pre <-cor(predta)
+cor_pre
+
+#post
+# yp <-as.numeric(paj_ts[13:18])
+# xp<-c(13:18)
+pstdta <- as.data.frame(cbind(xp,yp))
+cor_post <- cor(pstdta)
+cor_post
+
+```
+
+Post intervention effect correlation is -0.25, which is less intense than pre intervention (-0.65)
+
+```{r COVariance}
+
+#pre
+# pre.ts <-ts(paj$visits.hr[1:9])
+# pre.tsm<-as.matrix(pre.ts)
+cov_pre <-cov(pre.tsm)
+cov_pre
+
+#post
+# pst.ts<-ts(paj$visits.hr[13:18])
+# pst.tsm<-as.matrix(pst.ts)
+cov_post <- cov(pst.tsm)
+cov_post
+
+#F test for significance of variances
+varianceTest(pre.tsm, pst.tsm)
+#alternative
+
+#Variance, using VAR (limitation: normally distributed populations)
+#pre
+var(paj$visits.hr[1:9])
+#post
+var(paj$visits.hr[13:18])
+#F test for significance of variances
+var.test(paj$visits.hr[1:9],paj$visits.hr[13:18])
+
+
+```
+With regards to Variance and Covariance (same test results), the post intervention is greater than pre intervention, and it is statistically different using F test of variances, leading to the conclusion that variance / covariance increased with intervention, which is less desirable. 
+
+
+ANALYSING REGRESSION SLOPES:
+Visually inspecting pre and post regression lines on a plot conveys useful information; dramatic when the slopes have opposite signs, but just as significant if the lines are parallel (that is, have equal or approximately equal slopes). In the latter case, the interpretation of the intervention effect points to the underlying system as the potential principal contributant to the intrinsic dynamism of the Measure.
+
+
+LIMITATIONS
+
+An obvious limitation of the Data Science applied in this paper is the sample size. More accurate statistics rely on larger sample sizes which place the samples in the normal distribution pattern, a distribution that is quoted as the gold standard and is assumed or is aimed for in standard statistical analysis. Time series, depending on the unit of time on which it is based, may suffer from paucity of data points. In this case, there were 18 monthly data points for tyhe population; samples were 9 and 6 respectively. If the data was weekly based, sample size quickly climbs up to 72, 36 and 24 respectively. For daily data at 5 days a week, 360, 180 and 120 are the respective results. Quarterly and yearly yield fewer data points in comparison. 
+
+The nature of Interventions and Measures can demand short time cycles (yielding fewer data points) for practicality and for meaningfulness. Health care organizations will not wait 5 years for an intervention effect, and any such effect may be confounded by the five years of intrinsic dynamism of the values of a particular Measure.
+
+In spite of this major shortcoming, the statistical processes applied to this case such as Outliers detection, t-test for mean difference, F-test for variances and modeling have all taken
+the sample sizes into account.
+
+SUMMARY
+
+An intervention aimed at visits-per-hour Measure has been analyzed and shows that 4 months after it was instituted, a positive change occurred, increasing the mean of the Measure from 1.53 to  1.91 by 0.38, a statistically significant difference, at a delta rate of almost 0.1 per month. Based on the post effect sample regression, the decay time for the change is approximately 10 months, that is, 10 months after the detection of the effect, the value of the Measure will be back down to where it was at the time of the introduction of intervention. The slope of both pre and post effect regression lines are almost the same, suggesting that a resident systemic inertia is in active. 
+
+The change produced by the intervention showed more variance and less correlation than baseline. A more desirable change should produce more correlation and less variance, which reflects relative interdependence and consistency.
+
+The results of the same intervention applied to different locations or to different Measures could be successfully and meaningfully compared using the parameters above in order to evaluate the intervention itself, and or the character of the different locations. Similarly, different interventions applied to the same Measure or to the same location may be similarly compared.
+
+Despite the small size of the samples from which Health care Measures Time Series suffer, the statistical analyses is sound, having taken said sample sizes into account. Weekly or even daily data can also effectively address this issue to satisfaction.
+
+The embrace of value-based care by the Healthcare System in the US demands first quantification, then analysis, followed by objective comparison of the measurements of the Measures picked to represent the values of interest. Obtaining the best or desired values of Measures for optimization of health management requires the use of interventions to effect changes in the values. Interventions can be viewed as tools and like tools in every industry, they have to be tested, compared and ranked in order to select the best: the most effective, most efficient and most powerful. At the same time, the strengths and weakness the tools unmask in the user will motivate if not evoke meaningful and useful changes in such user.  This paper demonstrates a methodology for the evaluation of any intervention applied to any Measure whose values can be represented as a timeseries dataset.
+
+
+
+
+PLOTS
+
+```{r plot original Time series, echo= FALSE}
+plot(paj_ts, ylab = "visits/hr", xlab ="month#", main = "Measure: Visits per Hour")
+```
+
+Alternative Plot
+```{r alternative plot time series, echo=FALSE}
+yyy<-paj[3]
+xxx<-c(1:18)
+pajdta <- as.data.frame(cbind(xxx,yyy))
+dygraph(pajdta, ylab = "visits/hr", xlab ="month#", main = "Time Series of Measure: 'Visits per Hour'") %>%
+ dyAxis("y", valueRange = c(1, 3.0)) 
+```
+
+
+
+```{r outliers plot,  echo=FALSE}
+plot(outliers_paj_ts)
+
+```
+
+
+
+```{r plot with intervention effects, echo= FALSE}
+plot(nwdta, xlim=c(0,20), ylim=c(1.0,3.0), col="blue",lty =1, main ="Time Series and Intervention Effects", ylab = "visits/hr", xlab = "month#")
+segments(1,1.706, 9,1.3607, col = "blue") #pre regression line
+segments(13,2.080,18,1.7361, col = "blue") #post regression line
+segments(9,1.3607, 13,1.188, lty=2, col = "brown") # extrapolation of pre regression line
+lines(paj_ts,col="black",lty =1 ) # original time series
+abline(v=c(9.0,13.0), col="orange") # Intervention implemented @ 9 and effects start @ 13 mos
+
+```
+
+
+
+```{r print dataset as table, echo=FALSE}
+
+htmlTable(paj)
+```
+
+Plotting with Dygraph
+
+```{r plot with dygraph, echo=FALSE}
+yyy<-paj[3]
+xxx<-c(1:18)
+dygdta <- as.data.frame(cbind(xxx,yyy))
+dygraph(dygdta,ylab = "visits/hr", xlab ="month#", main = "Measure: Visits per Hour") %>%
+  dyEvent("9", "Intervention", labelLoc = "bottom") %>%
+  dyEvent("13", "Effect", labelLoc = "bottom")
+
+
+```
+
+Add pre and post segments regression line from nwdta subset
+
+```{r combo plot, echo= FALSE}
+cmbo <- as.data.frame(cbind(dygdta, nwdta))
+cmbo1 <-cmbo[,-3]
+colnames(cmbo1) <-c("xxx","Orig TimeSeries", "pre/post regression lines")
+dygraph(cmbo1,ylab = "visits/hr", xlab ="month#", main = "Measure Intervention Effects: Visits per Hour") %>%
+  dyAxis("y", valueRange = c(1, 3.0)) %>%
+  dySeries("pre/post regression lines",strokeWidth = 2, strokePattern = "dashed") %>%
+  dyLegend(width = 500)%>%
+  dyEvent("9", "Intervention", labelLoc = "bottom", strokePattern = "solid") %>%
+  dyEvent("13", "Effect", labelLoc = "bottom", strokePattern = "solid")%>%
+  dyShading(from = "9", to = "13")
+
+
+```
+
+Alternative Plots using Dygraph and DySeries
+```{r alternative plot all with Dygraph, echo=FALSE}
+# Breakdown into series.
+# 1. Main: use dygdta as basis; add intervention and effect lines @ 9 and 13.
+# 2. Get pre-intervention data, pre.int
+# 3. Get post effect data, post.effect
+# 4. Bind all in a megaplot
+orig.dta <-dygdta
+colnames(orig.dta) <- c("xxx", "orig.timeseries")
+
+pre.int<-as.data.frame(pre_mn$fitted.values)
+pre.int$pre.int <-pre.int[10:18,2]<- NA
+pre.int <- as.data.frame(pre.int[,c(-2,-3)])
+colnames(pre.int) <- "pre.intervention"
+
+post.effect.tmp<-as.data.frame(pst_mn$fitted.values)
+colnames(post.effect.tmp) <-"post.effect"
+rownames(post.effect.tmp) <- 13:18
+
+post.effect.tmp1 <-as.data.frame(x = c(1:12))
+post.effect.tmp1$post.effect <-post.effect.tmp1[1:12,1] <- NA
+post.effect.tmp1 <-post.effect.tmp1[-1]
+
+post.effect <-as.data.frame(rbind(post.effect.tmp1, post.effect.tmp))
+
+megaplot <-cbind(orig.dta,pre.int,post.effect)
+
+dygraph(megaplot, ylab = "visits/hr", xlab ="month#", main = "Intervention Effects on Measure, 'Visits per Hour'") %>%
+   dyAxis("y", valueRange = c(1, 3.0)) %>%
+  dySeries("orig.timeseries", strokePattern = "solid") %>%
+  dySeries("pre.intervention",strokeWidth = 2, strokePattern = "dashed") %>%
+  dySeries("post.effect",strokeWidth = 2, strokePattern = "dotdash") %>%
+  dyLegend(width = 600)%>%
+  dyEvent("9", "Intervention", labelLoc = "bottom", strokePattern = "dotted") %>%
+  dyEvent("13", "post effect", labelLoc = "bottom", strokePattern = "dotted")%>%
+  dyShading(from = "9", to = "13")
+
+```
+
+
+
