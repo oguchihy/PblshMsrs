@@ -33,6 +33,7 @@ library(htmlTable)
 library(dygraphs)
 library(xts)
 library(magrittr)
+library(dplyr)
 #get file
 paj <- read.csv("PajaroVisits-hr.csv")
 #convert to time series
@@ -161,7 +162,7 @@ Method:
 
 1. Set up the R environment
 
-```{r environ echo=FALSE}
+```{r environ, echo=FALSE}
 library(ggplot2)
 library(forecast)
 library(astsa)
@@ -177,6 +178,17 @@ library(TSA)
 library(TTR)
 library(lme4)
 library(timeSeries)
+library(timeSeries)
+library(calibrate)
+library(vars)
+library(readr)
+library(gridExtra)
+library(grid)
+library(htmlTable)
+library(dygraphs)
+library(xts)
+library(magrittr)
+library(dplyr)
 ```
 
 2. Load File and convert to Time Series
@@ -209,7 +221,7 @@ outliers_paj_ts <- tso(paj_ts, types = c("TC", "AO", "LS", "IO", "SLS"))
 outliers_paj_ts
 
 ```
-The resulting call above identifies 1 outlier of the "Additive Outlier" (AO) type, occurring on month # 13, with a coefficient (coefhat) of 1.3953, which is equal to an absolutete change of +1.395*1 = 1.395 from the estimated / projected baseline at month # 13 (see graph below). AO-type 
+The resulting call above identifies 1 outlier (AO13) of the "Additive Outlier" (AO) type, occurring on month # 13, with a coefficient (coefhat) of 1.3953, which is equal to an absolutete change of +1.395*1 = 1.395 from the estimated / projected baseline at month # 13 (see graph below).  
 
 Plot outliers
 ```{r plot outliers,  echo=FALSE}
@@ -373,7 +385,7 @@ cor_post
 
 Post intervention effect correlation is -0.25, which is less intense than pre intervention (-0.65)
 
-```{r COVariance}
+```{r COVariance, echo=FALSE}
 
 #pre
 # pre.ts <-ts(paj$visits.hr[1:9])
@@ -446,14 +458,17 @@ pajdta <- as.data.frame(cbind(xxx,yyy))
 dygraph(pajdta, ylab = "visits/hr", xlab ="month#", main = "Time Series of Measure: 'Visits per Hour'") %>%
  dyAxis("y", valueRange = c(1, 3.0)) 
 ```
-
+Figure 1: Time series of the Measure, "Visits per hour".
+Start time: January 2016 (month #1); end time, June 2017 (month #18); monthly units. 
+Y-axis: average visits per hour for the month.
 
 
 ```{r outliers plot,  echo=FALSE}
 plot(outliers_paj_ts)
 
 ```
-
+Figure 2: Identifying and locating Outliers in the time series.
+Upper plot ("Original and adjusted series") shows an outlier point in red, at 2.74 visits per hour; while the lower plot ("Outlier effects") locates the time: at month #13; and the magnitude, approximately 1.4 units from projected baseline. 
 
 
 ```{r plot with intervention effects, echo= FALSE}
@@ -485,6 +500,7 @@ dygraph(dygdta,ylab = "visits/hr", xlab ="month#", main = "Measure: Visits per H
 
 
 ```
+
 
 Add pre and post segments regression line from nwdta subset
 
@@ -537,10 +553,62 @@ dygraph(megaplot, ylab = "visits/hr", xlab ="month#", main = "Intervention Effec
   dySeries("post.effect",strokeWidth = 2, strokePattern = "dotdash") %>%
   dyLegend(width = 600)%>%
   dyEvent("9", "Intervention", labelLoc = "bottom", strokePattern = "dotted") %>%
-  dyEvent("13", "post effect", labelLoc = "bottom", strokePattern = "dotted")%>%
+  dyEvent("13", "onset effect", labelLoc = "bottom", strokePattern = "dotted")%>%
   dyShading(from = "9", to = "13")
 
 ```
+Figure 3: Intervention effects
+The solid line represents the original times series now divided by vertical dotted lines to indicate the implementation of the intervention in month #9, and the start of the effect of the intervention in month #13 (as determined by the outlier identification -- see above), marking out a transitional period of 4 months (shaded). 
+The dashed line pre-intervention is the linear regression of the subseries up to the time of the implementation of the intervention. Similarly, the dot-dashed line starting from the onset of the effect is the post effect linear regression line of that subseries.
 
+
+Tables and calculations
+
+#Outliers call
+```{r outliers call, echo=FALSE}
+
+outliers_paj_ts <- tso(paj_ts, types = c("TC", "AO", "LS", "IO", "SLS"))
+outliers_paj_ts
+```
+The Outlier call above identifies 1 outlier (AO13) of the "Additive Outlier" (AO) type, occurring at month # 13, with a coefficient (coefhat) of 1.3953, which is equal to an absolute change of +1.395*1 = 1.395 from the estimated / projected baseline at month # 13 (see fig. ___).
+
+
+Means
+```{r tables pre lm fit, echo=FALSE}
+#pre-effect
+# LM fit
+pre_mn
+```
+
+```{r tables pre mean and fitted values, echo=FALSE }
+mean.pre<-mean(pre_mn$fitted.values)
+htmlTable(as.data.frame(round(pre_mn$fitted.values,2)))
+mean.pre
+
+```
+Pre-intervention linear regression fitted values.
+Mean = 1.533333
+
+
+```{r tables post lm fit, echo=FALSE}
+#LM fit
+pst_mn
+```
+
+```{r tables post, echo=FALSE }
+mean.post<-mean(pst_mn$fitted.values)
+htmlTable(as.data.frame(round(pst_mn$fitted.values,2)))
+mean.post
+
+```
+Post effect linear regression fitted values.
+Mean =  1.908333
+
+```{r}
+#Check for statistical significance T test
+
+t.test(pre_mn$fitted.values,pst_mn$fitted.values)
+```
+Two-sample t test for significant difference of means of pre-intervention (x) and post effect (y) subseries: p-value = 0.0002 translates to "significant statistical difference"
 
 
